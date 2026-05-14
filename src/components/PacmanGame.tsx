@@ -21,14 +21,13 @@ interface Ghost extends Entity {
   id: string;
   color: string;
   strategy: 'A_STAR' | 'BFS' | 'DIJKSTRA' | 'RANDOM';
-  isFrightened: boolean;
   spawnPos: Point;
 }
 
 const GHOST_CONFIGS = [
-  { id: 'blinky', color: COLORS.BLINKY, strategy: 'A_STAR' as const },
-  { id: 'pinky', color: COLORS.PINKY, strategy: 'BFS' as const },
-  { id: 'inky', color: COLORS.INKY, strategy: 'DIJKSTRA' as const },
+  { id: 'blinky', color: COLORS.BLINKY, strategy: 'A_STAR' as const },//đỏ 
+  { id: 'pinky', color: COLORS.PINKY, strategy: 'BFS' as const },// hồng
+  { id: 'inky', color: COLORS.INKY, strategy: 'DIJKSTRA' as const },//xanh
 ];
 
 const GHOST_PRIORITY = new Map(GHOST_CONFIGS.map((ghost, index) => [ghost.id, index] as const));
@@ -60,7 +59,6 @@ export default function PacmanGame() {
     ghosts: [] as Ghost[],
     pellets: new Set<string>(),
     powerPellets: new Set<string>(),
-    frightenedTimer: 0,
     spawns: { pacman: { x: 9, y: 13 }, ghost: { x: 9, y: 1 } }
   });
 
@@ -99,11 +97,9 @@ export default function PacmanGame() {
         dir: DIRECTIONS.UP,
         nextDir: DIRECTIONS.UP,
         spawnPos: { ...GHOST_HOME_POSITIONS[config.id] },
-        isFrightened: false,
       })),
       pellets,
       powerPellets,
-      frightenedTimer: 0,
       spawns: { pacman: pacmanSpawn, ghost: ghostSpawn }
     };
 
@@ -188,20 +184,17 @@ export default function PacmanGame() {
 
     // Ghosts
     game.ghosts.forEach(g => {
-      ctx.fillStyle = g.isFrightened ? COLORS.FRIGHTENED : g.color;
+      ctx.fillStyle = g.color;
       const gx = g.pos.x * TILE_SIZE + TILE_SIZE / 2;
       const gy = g.pos.y * TILE_SIZE + TILE_SIZE / 2;
       ctx.beginPath(); ctx.arc(gx, gy - 2, TILE_SIZE / 2 - 2, Math.PI, 0);
       ctx.lineTo(gx + TILE_SIZE / 2 - 2, gy + TILE_SIZE / 2 - 2);
       ctx.lineTo(gx - TILE_SIZE / 2 + 2, gy + TILE_SIZE / 2 - 2);
       ctx.fill();
-      // Eyes (only if not frightened)
-      if (!g.isFrightened) {
-        ctx.fillStyle = '#fff';
-        ctx.beginPath(); ctx.arc(gx - 4, gy - 4, 3, 0, Math.PI * 2); ctx.arc(gx + 4, gy - 4, 3, 0, Math.PI * 2); ctx.fill();
-        ctx.fillStyle = '#000';
-        ctx.beginPath(); ctx.arc(gx - 4 + g.dir.x * 2, gy - 4 + g.dir.y * 2, 1.5, 0, Math.PI * 2); ctx.arc(gx + 4 + g.dir.x * 2, gy - 4 + g.dir.y * 2, 1.5, 0, Math.PI * 2); ctx.fill();
-      }
+      ctx.fillStyle = '#fff';
+      ctx.beginPath(); ctx.arc(gx - 4, gy - 4, 3, 0, Math.PI * 2); ctx.arc(gx + 4, gy - 4, 3, 0, Math.PI * 2); ctx.fill();
+      ctx.fillStyle = '#000';
+      ctx.beginPath(); ctx.arc(gx - 4 + g.dir.x * 2, gy - 4 + g.dir.y * 2, 1.5, 0, Math.PI * 2); ctx.arc(gx + 4 + g.dir.x * 2, gy - 4 + g.dir.y * 2, 1.5, 0, Math.PI * 2); ctx.fill();
     });
   }, []);
 
@@ -209,7 +202,9 @@ export default function PacmanGame() {
     if (status !== 'PLAYING') return;
     
     const game = gameRef.current;
-    const speed = 0.05;
+    const PACMAN_SPEED = 0.035;
+    const GHOST_SPEED = 0.028;
+    const FRIGHTENED_GHOST_SPEED = 0.02;
 
     const isGhostBlockingPosition = (x: number, y: number, ghostId: string) => {
       const currentPriority = GHOST_PRIORITY.get(ghostId) ?? Number.MAX_SAFE_INTEGER;
@@ -233,7 +228,7 @@ export default function PacmanGame() {
 
     // 1. Pacman Logic
     const p = game.pacman;
-    const pAtTarget = Math.abs(p.pos.x - p.target.x) < speed && Math.abs(p.pos.y - p.target.y) < speed;
+    const pAtTarget = Math.abs(p.pos.x - p.target.x) < PACMAN_SPEED && Math.abs(p.pos.y - p.target.y) < PACMAN_SPEED;
     if (pAtTarget) {
       p.pos = { ...p.target };
       if (canMove({ x: p.pos.x + p.nextDir.x, y: p.pos.y + p.nextDir.y }, GRID)) p.dir = p.nextDir;
@@ -246,10 +241,10 @@ export default function PacmanGame() {
       
       const key = `${Math.round(p.pos.x)},${Math.round(p.pos.y)}`;
       if (game.pellets.has(key)) { game.pellets.delete(key); setScore(s => s + 10); }
-      if (game.powerPellets.has(key)) { game.powerPellets.delete(key); setScore(s => s + 50); game.frightenedTimer = 400; game.ghosts.forEach(g => g.isFrightened = true); }
+      if (game.powerPellets.has(key)) { game.powerPellets.delete(key); setScore(s => s + 50); }
     } else {
-      p.pos.x += p.dir.x * speed;
-      p.pos.y += p.dir.y * speed;
+      p.pos.x += p.dir.x * PACMAN_SPEED;
+      p.pos.y += p.dir.y * PACMAN_SPEED;
     }
     // Tunnel
     if (p.pos.x < 0) { p.pos.x = GRID[0].length - 1; p.target.x = GRID[0].length - 1; }
@@ -258,7 +253,7 @@ export default function PacmanGame() {
     // 2. Ghost Logic
     let collisionOccurred = false;
     game.ghosts.forEach(g => {
-      const gAtTarget = Math.abs(g.pos.x - g.target.x) < speed && Math.abs(g.pos.y - g.target.y) < speed;
+      const gAtTarget = Math.abs(g.pos.x - g.target.x) < GHOST_SPEED && Math.abs(g.pos.y - g.target.y) < GHOST_SPEED;
       if (gAtTarget) {
         g.pos = { ...g.target };
         const ghostIntPos = { x: Math.round(g.pos.x), y: Math.round(g.pos.y) };
@@ -274,7 +269,10 @@ export default function PacmanGame() {
         
         let next: Point | null = null;
 
-        if (g.isFrightened) {
+        if (g.strategy === 'A_STAR') next = aStar(ghostIntPos, pacIntPos, GRID, otherGhostPositions);
+        else if (g.strategy === 'BFS') next = bfs(ghostIntPos, pacIntPos, GRID, otherGhostPositions);
+        else if (g.strategy === 'DIJKSTRA') next = dijkstra(ghostIntPos, pacIntPos, GRID, otherGhostPositions);
+        else {
           const valid = Object.values(DIRECTIONS).filter(d => {
             const nextPos = { x: ghostIntPos.x + d.x, y: ghostIntPos.y + d.y };
             return canMove(nextPos, GRID) && !getGhostAtPosition(nextPos.x, nextPos.y, g.id);
@@ -284,30 +282,14 @@ export default function PacmanGame() {
           } else {
             next = { x: ghostIntPos.x, y: ghostIntPos.y };
           }
-        } else {
-          if (g.strategy === 'A_STAR') next = aStar(ghostIntPos, pacIntPos, GRID, otherGhostPositions);
-          else if (g.strategy === 'BFS') next = bfs(ghostIntPos, pacIntPos, GRID, otherGhostPositions);
-          else if (g.strategy === 'DIJKSTRA') next = dijkstra(ghostIntPos, pacIntPos, GRID, otherGhostPositions);
-          else {
-            const valid = Object.values(DIRECTIONS).filter(d => {
-              const nextPos = { x: ghostIntPos.x + d.x, y: ghostIntPos.y + d.y };
-              return canMove(nextPos, GRID) && !getGhostAtPosition(nextPos.x, nextPos.y, g.id);
-            });
-            if (valid.length > 0) {
-              next = { x: ghostIntPos.x + valid[Math.floor(Math.random() * valid.length)].x, y: ghostIntPos.y + valid[Math.floor(Math.random() * valid.length)].y };
-            } else {
-              next = { x: ghostIntPos.x, y: ghostIntPos.y };
-            }
-          }
         }
         if (next) {
           g.dir = { x: next.x - g.pos.x, y: next.y - g.pos.y };
           g.target = next;
         }
       } else {
-        const gSpeed = g.isFrightened ? speed * 0.6 : speed * 0.8;
-        const nextX = g.pos.x + g.dir.x * gSpeed;
-        const nextY = g.pos.y + g.dir.y * gSpeed;
+        const nextX = g.pos.x + g.dir.x * GHOST_SPEED;
+        const nextY = g.pos.y + g.dir.y * GHOST_SPEED;
 
         if (!isGhostBlockingPosition(nextX, nextY, g.id)) {
           g.pos.x = nextX;
@@ -321,35 +303,24 @@ export default function PacmanGame() {
       const dist = Math.sqrt(Math.pow(g.pos.x - p.pos.x, 2) + Math.pow(g.pos.y - p.pos.y, 2));
       if (dist < 0.6 && !collisionOccurred) {
         collisionOccurred = true;
-        if (g.isFrightened) { 
-          g.pos = { ...g.spawnPos }; 
-          g.target = { ...g.spawnPos }; 
-          setScore(s => s + 200); 
-        } else {
-          setLives(l => {
-            const newLives = l - 1;
-            if (newLives <= 0) {
-              setStatus('GAMEOVER');
-            }
-            return newLives;
-          });
-          // Reset positions
-          p.pos = { ...game.spawns.pacman }; 
-          p.target = { ...game.spawns.pacman };
-          p.dir = DIRECTIONS.RIGHT;
-          game.ghosts.forEach(gh => { 
-            gh.pos = { ...gh.spawnPos }; 
-            gh.target = { ...gh.spawnPos }; 
-            gh.dir = DIRECTIONS.UP;
-          });
-        }
+        setLives(l => {
+          const newLives = l - 1;
+          if (newLives <= 0) {
+            setStatus('GAMEOVER');
+          }
+          return newLives;
+        });
+        // Reset positions
+        p.pos = { ...game.spawns.pacman }; 
+        p.target = { ...game.spawns.pacman };
+        p.dir = DIRECTIONS.RIGHT;
+        game.ghosts.forEach(gh => { 
+          gh.pos = { ...gh.spawnPos }; 
+          gh.target = { ...gh.spawnPos }; 
+          gh.dir = DIRECTIONS.UP;
+        });
       }
     });
-
-    if (game.frightenedTimer > 0) {
-      game.frightenedTimer--;
-      if (game.frightenedTimer === 0) game.ghosts.forEach(g => g.isFrightened = false);
-    }
     
     if (game.pellets.size === 0 && game.powerPellets.size === 0) {
       setStatus('WIN');
@@ -426,6 +397,11 @@ export default function PacmanGame() {
         <div className="flex gap-4 text-[10px] font-bold tracking-[0.2em] uppercase">
           <div className="flex gap-2 items-center"><div className="px-2 py-1 bg-neutral-800 rounded">WASD</div> <span>Move</span></div>
           <div className="flex gap-2 items-center"><div className="px-2 py-1 bg-neutral-800 rounded">ARROWS</div> <span>Move</span></div>
+        </div>
+        <div className="flex flex-col items-center gap-2 text-[10px] font-bold tracking-[0.2em] uppercase">
+          <div className="flex items-center gap-2"><span className="text-red-500">Ma đỏ</span> <span>: A*</span></div>
+          <div className="flex items-center gap-2"><span className="text-pink-400">Ma hồng</span> <span>: BFS</span></div>
+          <div className="flex items-center gap-2"><span className="text-cyan-400">Ma xanh</span> <span>: Dijkstra</span></div>
         </div>
       </div>
     </div>
