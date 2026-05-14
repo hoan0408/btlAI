@@ -1,0 +1,6 @@
+{
+  "name": "AI Pac-Man: The Pathfinding Challenge",
+  "description": "A classic Pac-Man clone featuring advanced AI ghosts using BFS, Dijkstra, and A* algorithms to hunt the player.",
+  "requestFramePermissions": [],
+  "majorCapabilities": []
+}
