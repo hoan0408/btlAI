@@ -7,7 +7,7 @@ import {
   DIRECTIONS, 
   Direction 
 } from '../constants/gameConstants';
-import { bfs, dijkstra, aStar, canMove, Point } from '../utils/pathfinding';
+import { bfs, aStar, canMove, Point } from '../utils/pathfinding';
 import { Trophy, Heart, Play, RefreshCw } from 'lucide-react';
 
 interface Entity {
@@ -20,14 +20,13 @@ interface Entity {
 interface Ghost extends Entity {
   id: string;
   color: string;
-  strategy: 'A_STAR' | 'BFS' | 'DIJKSTRA' | 'RANDOM';
+  strategy: 'A_STAR' | 'BFS' | 'RANDOM';
   spawnPos: Point;
 }
 
 const GHOST_CONFIGS = [
   { id: 'blinky', color: COLORS.BLINKY, strategy: 'A_STAR' as const },//đỏ 
   { id: 'pinky', color: COLORS.PINKY, strategy: 'BFS' as const },// hồng
-  { id: 'inky', color: COLORS.INKY, strategy: 'DIJKSTRA' as const },//xanh
 ];
 
 const GHOST_PRIORITY = new Map(GHOST_CONFIGS.map((ghost, index) => [ghost.id, index] as const));
@@ -204,7 +203,6 @@ export default function PacmanGame() {
     const game = gameRef.current;
     const PACMAN_SPEED = 0.035;
     const GHOST_SPEED = 0.028;
-    const FRIGHTENED_GHOST_SPEED = 0.02;
 
     const isGhostBlockingPosition = (x: number, y: number, ghostId: string) => {
       const currentPriority = GHOST_PRIORITY.get(ghostId) ?? Number.MAX_SAFE_INTEGER;
@@ -271,7 +269,6 @@ export default function PacmanGame() {
 
         if (g.strategy === 'A_STAR') next = aStar(ghostIntPos, pacIntPos, GRID, otherGhostPositions);
         else if (g.strategy === 'BFS') next = bfs(ghostIntPos, pacIntPos, GRID, otherGhostPositions);
-        else if (g.strategy === 'DIJKSTRA') next = dijkstra(ghostIntPos, pacIntPos, GRID, otherGhostPositions);
         else {
           const valid = Object.values(DIRECTIONS).filter(d => {
             const nextPos = { x: ghostIntPos.x + d.x, y: ghostIntPos.y + d.y };
@@ -385,7 +382,6 @@ export default function PacmanGame() {
                 <div className="mt-12 grid grid-cols-2 gap-x-8 gap-y-2 opacity-50 text-[10px] font-mono tracking-widest text-center">
                   <div className="flex items-center gap-2">BLINKY <span className="text-red-500">A*</span></div>
                   <div className="flex items-center gap-2">PINKY <span className="text-pink-400">BFS</span></div>
-                  <div className="flex items-center gap-2">INKY <span className="text-cyan-400">DIJKSTRA</span></div>
                 </div>
               )}
             </motion.div>
@@ -401,7 +397,6 @@ export default function PacmanGame() {
         <div className="flex flex-col items-center gap-2 text-[10px] font-bold tracking-[0.2em] uppercase">
           <div className="flex items-center gap-2"><span className="text-red-500">Ma đỏ</span> <span>: A*</span></div>
           <div className="flex items-center gap-2"><span className="text-pink-400">Ma hồng</span> <span>: BFS</span></div>
-          <div className="flex items-center gap-2"><span className="text-cyan-400">Ma xanh</span> <span>: Dijkstra</span></div>
         </div>
       </div>
     </div>

@@ -1,5 +1,5 @@
 
-import { Direction, DIRECTIONS } from '../constants/gameConstants';
+import { DIRECTIONS } from '../constants/gameConstants';
 
 export interface Point {
   x: number;
@@ -38,53 +38,6 @@ export function bfs(start: Point, target: Point, map: string[][], blockedPositio
       if (canMove(next, map) && !visited.has(k) && (!blockedPositions || !blockedPositions.has(k))) {
         visited.add(k);
         queue.push({ point: next, firstMove });
-      }
-    }
-  }
-  return null;
-}
-
-/**
- * Dijkstra's Algorithm
- * Finds the shortest path. Equivalent to BFS in this unweighted grid,
- * but implemented here to showcase the algorithm structure.
- */
-export function dijkstra(start: Point, target: Point, map: string[][], blockedPositions?: Set<string>): Point | null {
-  const distances: Record<string, number> = {};
-  const firstMoves: Record<string, Point> = {};
-  const queue: Point[] = [];
-  
-  const key = (p: Point) => `${p.x},${p.y}`;
-  distances[key(start)] = 0;
-
-  for (const dir of Object.values(DIRECTIONS)) {
-    const next = { x: start.x + dir.x, y: start.y + dir.y };
-    if (canMove(next, map) && (!blockedPositions || !blockedPositions.has(key(next)))) {
-      const k = key(next);
-      distances[k] = 1;
-      firstMoves[k] = next;
-      queue.push(next);
-    }
-  }
-
-  while (queue.length > 0) {
-    queue.sort((a, b) => (distances[key(a)] || Infinity) - (distances[key(b)] || Infinity));
-    const current = queue.shift()!;
-    const currentDist = distances[key(current)];
-
-    if (current.x === target.x && current.y === target.y) {
-      return firstMoves[key(current)];
-    }
-
-    for (const dir of Object.values(DIRECTIONS)) {
-      const next = { x: current.x + dir.x, y: current.y + dir.y };
-      const k = key(next);
-      const newDist = currentDist + 1;
-
-      if (canMove(next, map) && (!blockedPositions || !blockedPositions.has(k)) && (distances[k] === undefined || newDist < distances[k])) {
-        distances[k] = newDist;
-        firstMoves[k] = firstMoves[key(current)];
-        queue.push(next);
       }
     }
   }
